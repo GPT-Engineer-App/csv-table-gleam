@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const CHUNK_SIZE = 100;
 const PAGE_SIZE = 50;
+const STORAGE_KEY = 'csvFileData';
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
@@ -15,8 +16,20 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRows, setTotalRows] = useState(0);
+  const [fileName, setFileName] = useState('');
   const fileInputRef = useRef(null);
   const fileReaderRef = useRef(null);
+
+  useEffect(() => {
+    const storedData = localStorage.getItem(STORAGE_KEY);
+    if (storedData) {
+      const { headers, data, fileName } = JSON.parse(storedData);
+      setHeaders(headers);
+      setCsvData(data);
+      setFileName(fileName);
+      setTotalRows(data.length - 1);
+    }
+  }, []);
 
   const processChunk = useCallback((reader) => {
     reader.read().then(({ done, value }) => {
@@ -30,13 +43,18 @@ const Index = () => {
 
       setCsvData((prevData) => {
         const newData = [...prevData, ...rows.map(row => row.split(',').map(cell => cell.trim()))];
-        setTotalRows(newData.length - 1); // Subtract 1 to exclude header row
+        setTotalRows(newData.length - 1);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          headers,
+          data: newData,
+          fileName
+        }));
         return newData;
       });
 
       processChunk(reader);
     });
-  }, []);
+  }, [headers, fileName]);
 
   const handleFileUpload = () => {
     const file = fileInputRef.current.files[0];
@@ -51,13 +69,15 @@ const Index = () => {
     setHeaders([]);
     setCurrentPage(1);
     setTotalRows(0);
+    setFileName(file.name);
 
     const reader = new FileReader();
 
     reader.onload = (e) => {
       const text = e.target.result;
       const headerRow = text.split('\n')[0];
-      setHeaders(headerRow.split(',').map(header => header.trim()));
+      const newHeaders = headerRow.split(',').map(header => header.trim());
+      setHeaders(newHeaders);
 
       const blob = new Blob([text.substring(text.indexOf('\n') + 1)], { type: 'text/csv' });
       const streamReader = blob.stream().getReader();
@@ -73,8 +93,19 @@ const Index = () => {
     reader.readAsText(file);
   };
 
-  const paginatedData = csvData.slice(1).slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const clearStoredData = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setCsvData([]);
+    setHeaders([]);
+    setFileName('');
+    setTotalRows(0);
+    setCurrentPage(1);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
+  const paginatedData = csvData.slice(1).slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const totalPages = Math.ceil(totalRows / PAGE_SIZE);
 
   return (
@@ -84,19 +115,26 @@ const Index = () => {
           <CardTitle>CSV File Uploader</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 mb-4">
             <Input
               type="file"
               accept=".csv"
               ref={fileInputRef}
               className="flex-grow"
+              onChange={(e) => setFileName(e.target.files[0]?.name || '')}
             />
             <Button onClick={handleFileUpload} disabled={isLoading}>
               {isLoading ? 'Loading...' : 'Upload CSV'}
             </Button>
           </div>
+          {fileName && (
+            <div className="flex items-center justify-between mb-4">
+              <span>Current file: {fileName}</span>
+              <Button onClick={clearStoredData} variant="outline">Clear Stored Data</Button>
+            </div>
+          )}
           {error && (
-            <Alert variant="destructive" className="mt-4">
+            <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
