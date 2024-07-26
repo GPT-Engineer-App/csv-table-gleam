@@ -6,8 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const PAGE_SIZE = 50;
-const DB_NAME = 'CsvStorage';
-const STORE_NAME = 'csvFiles';
+const STORAGE_KEY = 'csvFileReference';
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
@@ -19,47 +18,163 @@ const Index = () => {
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState(0);
   const fileInputRef = useRef(null);
+  const fileRef = useRef(null);
 
-  // ... (keep all the existing functions: openDatabase, saveToIndexedDB, loadFromIndexedDB)
+  useEffect(() => {
+    const storedFileName = localStorage.getItem(STORAGE_KEY);
+    if (storedFileName) {
+      setFileName(storedFileName);
+    }
+  }, []);
 
-  const processFile = useCallback(async (content) => {
-    setIsLoading(true);
-    const rows = content.split('\n');
-    const headers = ['Enrich', ...rows[0].split(',').map(header => header.trim())];
-    setHeaders(headers);
-    setTotalRows(rows.length - 1);
-    
-    const startIndex = (currentPage - 1) * PAGE_SIZE + 1;
-    const endIndex = Math.min(startIndex + PAGE_SIZE, rows.length);
-    const pageData = rows.slice(startIndex, endIndex).map(row => ['', ...row.split(',').map(cell => cell.trim())]);
-    
-    setCsvData(pageData);
-    setIsLoading(false);
+  const processFile = useCallback((file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const rows = text.split('\n');
+      const headers = rows[0].split(',').map(header => header.trim());
+      setHeaders(headers);
+      setTotalRows(rows.length - 1);
+      
+      const startIndex = (currentPage - 1) * PAGE_SIZE + 1;
+      const endIndex = Math.min(startIndex + PAGE_SIZE, rows.length);
+      const pageData = rows.slice(startIndex, endIndex).map(row => row.split(',').map(cell => cell.trim()));
+      
+      setCsvData(pageData);
+      setIsLoading(false);
+    };
+    reader.onerror = () => {
+      setError('An error occurred while reading the file.');
+      setIsLoading(false);
+    };
+    reader.readAsText(file);
   }, [currentPage]);
 
-  // ... (keep loadSavedFile, handleFileUpload, clearStoredData as they were)
+  const handleFileUpload = () => {
+    const file = fileInputRef.current.files[0];
+    if (!file) {
+      setError('Please select a CSV file first.');
+      return;
+    }
 
-  const changePage = async (newPage) => {
-    setCurrentPage(newPage);
-    const content = await loadFromIndexedDB(fileName);
-    if (content) {
-      await processFile(content);
-    } else {
-      setError('File content not found. Please upload the file again.');
+    setIsLoading(true);
+    setError('');
+    setCsvData([]);
+    setHeaders([]);
+    setCurrentPage(1);
+    setTotalRows(0);
+    setFileName(file.name);
+    setFileSize(file.size);
+    fileRef.current = file;
+
+    localStorage.setItem(STORAGE_KEY, file.name);
+    processFile(file);
+  };
+
+  const clearStoredData = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setCsvData([]);
+    setHeaders([]);
+    setFileName('');
+    setTotalRows(0);
+    setCurrentPage(1);
+    setFileSize(0);
+    fileRef.current = null;
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
-  const handleEnrich = (rowIndex) => {
-    // Placeholder for enrich functionality
-    console.log(`Enrich row ${rowIndex}`);
-    // You can implement the actual enrichment logic here
+  const changePage = (newPage) => {
+    setCurrentPage(newPage);
+    setIsLoading(true);
+    if (fileRef.current) {
+      processFile(fileRef.current);
+    } else {
+      setIsLoading(false);
+      setError('File reference lost. Please upload the file again.');
+    }
   };
 
-  // ... (keep totalPages and formatFileSize as they were)
+  const totalPages = Math.ceil(totalRows / PAGE_SIZE);
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   return (
     <div className="container mx-auto p-4">
-      {/* ... (keep the file upload Card and CSV Data Statistics Card as they were) */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>CSV File Uploader</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-4 mb-4">
+            <Input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              className="flex-grow"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  setFileName(file.name);
+                  setFileSize(file.size);
+                } else {
+                  setFileName('');
+                  setFileSize(0);
+                }
+              }}
+            />
+            <Button onClick={handleFileUpload} disabled={isLoading}>
+              {isLoading ? 'Loading...' : 'Upload CSV'}
+            </Button>
+          </div>
+          {fileName && (
+            <div className="flex items-center justify-between mb-4">
+              <span>Current file: {fileName}</span>
+              <Button onClick={clearStoredData} variant="outline">Clear Stored Data</Button>
+            </div>
+          )}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {headers.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>CSV Data Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <h3 className="text-sm font-medium">Total Rows</h3>
+                <p className="text-2xl font-bold">{totalRows.toLocaleString()}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium">Total Columns</h3>
+                <p className="text-2xl font-bold">{headers.length}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium">File Size</h3>
+                <p className="text-2xl font-bold">{formatFileSize(fileSize)}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium">Total Pages</h3>
+                <p className="text-2xl font-bold">{totalPages}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {headers.length > 0 && (
         <Card>
@@ -79,12 +194,7 @@ const Index = () => {
                 <TableBody>
                   {csvData.map((row, rowIndex) => (
                     <TableRow key={rowIndex}>
-                      <TableCell>
-                        <Button onClick={() => handleEnrich(rowIndex)} size="sm">
-                          Enrich
-                        </Button>
-                      </TableCell>
-                      {row.slice(1).map((cell, cellIndex) => (
+                      {row.map((cell, cellIndex) => (
                         <TableCell key={cellIndex}>{cell}</TableCell>
                       ))}
                     </TableRow>
