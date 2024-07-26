@@ -16,6 +16,7 @@ const Index = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalRows, setTotalRows] = useState(0);
   const [fileName, setFileName] = useState('');
+  const [fileSize, setFileSize] = useState(0);
   const fileInputRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -63,6 +64,7 @@ const Index = () => {
     setCurrentPage(1);
     setTotalRows(0);
     setFileName(file.name);
+    setFileSize(file.size);
     fileRef.current = file;
 
     localStorage.setItem(STORAGE_KEY, file.name);
@@ -76,6 +78,7 @@ const Index = () => {
     setFileName('');
     setTotalRows(0);
     setCurrentPage(1);
+    setFileSize(0);
     fileRef.current = null;
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -95,6 +98,14 @@ const Index = () => {
 
   const totalPages = Math.ceil(totalRows / PAGE_SIZE);
 
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   return (
     <div className="container mx-auto p-4">
       <Card className="mb-6">
@@ -108,7 +119,16 @@ const Index = () => {
               accept=".csv"
               ref={fileInputRef}
               className="flex-grow"
-              onChange={(e) => setFileName(e.target.files[0]?.name || '')}
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  setFileName(file.name);
+                  setFileSize(file.size);
+                } else {
+                  setFileName('');
+                  setFileSize(0);
+                }
+              }}
             />
             <Button onClick={handleFileUpload} disabled={isLoading}>
               {isLoading ? 'Loading...' : 'Upload CSV'}
@@ -127,6 +147,34 @@ const Index = () => {
           )}
         </CardContent>
       </Card>
+
+      {headers.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>CSV Data Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <h3 className="text-sm font-medium">Total Rows</h3>
+                <p className="text-2xl font-bold">{totalRows.toLocaleString()}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium">Total Columns</h3>
+                <p className="text-2xl font-bold">{headers.length}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium">File Size</h3>
+                <p className="text-2xl font-bold">{formatFileSize(fileSize)}</p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium">Total Pages</h3>
+                <p className="text-2xl font-bold">{totalPages}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {headers.length > 0 && (
         <Card>
