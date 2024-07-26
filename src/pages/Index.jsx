@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { motion } from 'framer-motion';
 
 const PAGE_SIZE = 50;
@@ -20,6 +19,7 @@ const Index = () => {
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState(0);
   const [animateRow, setAnimateRow] = useState(null);
+  const [draggedHeader, setDraggedHeader] = useState(null);
   const fileInputRef = useRef(null);
   const fileHandleRef = useRef(null);
 
@@ -41,12 +41,24 @@ const Index = () => {
 
   // ... (keep the loadSavedFile, handleFileUpload, clearStoredData, changePage, and formatFileSize functions as they were)
 
-  const onDragEnd = (result) => {
-    if (!result.destination) return;
+  const handleDragStart = (e, header) => {
+    setDraggedHeader(header);
+  };
 
-    const newHeaders = Array.from(headers);
-    const [reorderedItem] = newHeaders.splice(result.source.index, 1);
-    newHeaders.splice(result.destination.index, 0, reorderedItem);
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e, targetHeader) => {
+    e.preventDefault();
+    if (draggedHeader === targetHeader) return;
+
+    const newHeaders = [...headers];
+    const draggedIndex = newHeaders.indexOf(draggedHeader);
+    const targetIndex = newHeaders.indexOf(targetHeader);
+
+    newHeaders.splice(draggedIndex, 1);
+    newHeaders.splice(targetIndex, 0, draggedHeader);
 
     setHeaders(newHeaders);
 
@@ -78,51 +90,43 @@ const Index = () => {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <DragDropContext onDragEnd={onDragEnd}>
-                <Table>
-                  <Droppable droppableId="headers" direction="horizontal">
-                    {(provided) => (
-                      <TableHeader {...provided.droppableProps} ref={provided.innerRef}>
-                        <TableRow>
-                          {headers.map((header, index) => (
-                            <Draggable key={header} draggableId={header} index={index}>
-                              {(provided) => (
-                                <TableHead
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  ref={provided.innerRef}
-                                >
-                                  {header}
-                                </TableHead>
-                              )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </TableRow>
-                      </TableHeader>
-                    )}
-                  </Droppable>
-                  <TableBody>
-                    {csvData.map((row, rowIndex) => (
-                      <motion.tr
-                        key={rowIndex}
-                        animate={animateRow === rowIndex ? { scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] } : {}}
-                        transition={{ duration: 0.5 }}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {headers.map((header) => (
+                      <TableHead
+                        key={header}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, header)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, header)}
+                        className="cursor-move"
                       >
-                        {row.map((cell, cellIndex) => (
-                          <TableCell key={cellIndex}>
-                            {cellIndex === 0 ? (
-                              <Button onClick={() => handleActionClick(rowIndex)}>Action</Button>
-                            ) : (
-                              cell
-                            )}
-                          </TableCell>
-                        ))}
-                      </motion.tr>
+                        {header}
+                      </TableHead>
                     ))}
-                  </TableBody>
-                </Table>
-              </DragDropContext>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {csvData.map((row, rowIndex) => (
+                    <motion.tr
+                      key={rowIndex}
+                      animate={animateRow === rowIndex ? { scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] } : {}}
+                      transition={{ duration: 0.5 }}
+                    >
+                      {row.map((cell, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          {cellIndex === 0 ? (
+                            <Button onClick={() => handleActionClick(rowIndex)}>Action</Button>
+                          ) : (
+                            cell
+                          )}
+                        </TableCell>
+                      ))}
+                    </motion.tr>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
             {/* ... (keep the pagination section as it was) */}
           </CardContent>
