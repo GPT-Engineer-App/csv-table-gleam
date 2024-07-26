@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const PAGE_SIZE = 50;
-const STORAGE_KEY = 'csvFileHandle';
+const STORAGE_KEY = 'csvFileReference';
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
@@ -18,75 +18,57 @@ const Index = () => {
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState(0);
   const fileInputRef = useRef(null);
-  const fileHandleRef = useRef(null);
-
-  const processFile = useCallback(async (file) => {
-    setIsLoading(true);
-    const text = await file.text();
-    const rows = text.split('\n');
-    const headers = rows[0].split(',').map(header => header.trim());
-    setHeaders(headers);
-    setTotalRows(rows.length - 1);
-    
-    const startIndex = (currentPage - 1) * PAGE_SIZE + 1;
-    const endIndex = Math.min(startIndex + PAGE_SIZE, rows.length);
-    const pageData = rows.slice(startIndex, endIndex).map(row => row.split(',').map(cell => cell.trim()));
-    
-    setCsvData(pageData);
-    setIsLoading(false);
-  }, [currentPage]);
-
-  const loadSavedFile = useCallback(async () => {
-    try {
-      const fileHandle = await JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (fileHandle) {
-        fileHandleRef.current = fileHandle;
-        const file = await fileHandle.getFile();
-        setFileName(file.name);
-        setFileSize(file.size);
-        await processFile(file);
-      }
-    } catch (err) {
-      console.error('Error loading saved file:', err);
-      setError('Failed to load the saved file. Please upload a new one.');
-    }
-  }, [processFile]);
+  const fileRef = useRef(null);
 
   useEffect(() => {
-    loadSavedFile();
-  }, [loadSavedFile]);
+    const storedFileName = localStorage.getItem(STORAGE_KEY);
+    if (storedFileName) {
+      setFileName(storedFileName);
+    }
+  }, []);
 
-  const handleFileUpload = async () => {
+  const processFile = useCallback((file) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const rows = text.split('\n');
+      const headers = rows[0].split(',').map(header => header.trim());
+      setHeaders(headers);
+      setTotalRows(rows.length - 1);
+      
+      const startIndex = (currentPage - 1) * PAGE_SIZE + 1;
+      const endIndex = Math.min(startIndex + PAGE_SIZE, rows.length);
+      const pageData = rows.slice(startIndex, endIndex).map(row => row.split(',').map(cell => cell.trim()));
+      
+      setCsvData(pageData);
+      setIsLoading(false);
+    };
+    reader.onerror = () => {
+      setError('An error occurred while reading the file.');
+      setIsLoading(false);
+    };
+    reader.readAsText(file);
+  }, [currentPage]);
+
+  const handleFileUpload = () => {
     const file = fileInputRef.current.files[0];
     if (!file) {
       setError('Please select a CSV file first.');
       return;
     }
 
-    try {
-      const fileHandle = await window.showSaveFilePicker({
-        types: [{
-          description: 'CSV Files',
-          accept: { 'text/csv': ['.csv'] },
-        }],
-        suggestedName: file.name,
-      });
-      
-      const writable = await fileHandle.createWritable();
-      await writable.write(file);
-      await writable.close();
+    setIsLoading(true);
+    setError('');
+    setCsvData([]);
+    setHeaders([]);
+    setCurrentPage(1);
+    setTotalRows(0);
+    setFileName(file.name);
+    setFileSize(file.size);
+    fileRef.current = file;
 
-      fileHandleRef.current = fileHandle;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(fileHandle));
-
-      setFileName(file.name);
-      setFileSize(file.size);
-      setCurrentPage(1);
-      await processFile(file);
-    } catch (err) {
-      console.error('Error saving file:', err);
-      setError('Failed to save the file. Please try again.');
-    }
+    localStorage.setItem(STORAGE_KEY, file.name);
+    processFile(file);
   };
 
   const clearStoredData = () => {
@@ -97,18 +79,19 @@ const Index = () => {
     setTotalRows(0);
     setCurrentPage(1);
     setFileSize(0);
-    fileHandleRef.current = null;
+    fileRef.current = null;
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
-  const changePage = async (newPage) => {
+  const changePage = (newPage) => {
     setCurrentPage(newPage);
-    if (fileHandleRef.current) {
-      const file = await fileHandleRef.current.getFile();
-      await processFile(file);
+    setIsLoading(true);
+    if (fileRef.current) {
+      processFile(fileRef.current);
     } else {
+      setIsLoading(false);
       setError('File reference lost. Please upload the file again.');
     }
   };
