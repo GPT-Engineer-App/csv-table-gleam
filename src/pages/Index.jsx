@@ -1,21 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
+  const [error, setError] = useState('');
+  const fileInputRef = useRef(null);
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
+  const handleFileUpload = () => {
+    const file = fileInputRef.current.files[0];
+    if (!file) {
+      setError('Please select a CSV file first.');
+      return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = (e) => {
       const text = e.target.result;
       const rows = text.split('\n');
-      const parsedData = rows.map(row => row.split(','));
+      const parsedData = rows.map(row => row.split(',').map(cell => cell.trim()));
+      
+      if (parsedData.length < 2) {
+        setError('The CSV file appears to be empty or invalid.');
+        return;
+      }
+
       setCsvData(parsedData);
+      setError('');
+    };
+
+    reader.onerror = () => {
+      setError('An error occurred while reading the file.');
     };
 
     reader.readAsText(file);
@@ -28,13 +47,20 @@ const Index = () => {
           <CardTitle>CSV File Uploader</CardTitle>
         </CardHeader>
         <CardContent>
-          <Input
-            type="file"
-            accept=".csv"
-            onChange={handleFileUpload}
-            className="mb-4"
-          />
-          <Button>Upload CSV</Button>
+          <div className="flex items-center space-x-4">
+            <Input
+              type="file"
+              accept=".csv"
+              ref={fileInputRef}
+              className="flex-grow"
+            />
+            <Button onClick={handleFileUpload}>Upload CSV</Button>
+          </div>
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
