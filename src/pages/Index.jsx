@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
 const STORAGE_KEY = 'csvFileReference';
@@ -38,7 +39,10 @@ const Index = () => {
       
       const startIndex = (currentPage - 1) * PAGE_SIZE + 1;
       const endIndex = Math.min(startIndex + PAGE_SIZE, rows.length);
-      const pageData = rows.slice(startIndex, endIndex).map(row => row.split(',').map(cell => cell.trim()));
+      const pageData = rows.slice(startIndex, endIndex).map(row => ({
+        isEnriched: false,
+        data: row.split(',').map(cell => cell.trim())
+      }));
       
       setCsvData(pageData);
       setIsLoading(false);
@@ -104,6 +108,16 @@ const Index = () => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleEnrich = (rowIndex) => {
+    setCsvData(prevData => 
+      prevData.map((row, index) => 
+        index === rowIndex ? { ...row, isEnriched: true } : row
+      )
+    );
+    toast.success(`Row ${rowIndex + 1} enriched successfully!`);
+    // Add your actual enrichment logic here
   };
 
   return (
@@ -186,6 +200,7 @@ const Index = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Enrich</TableHead>
                     {headers.map((header, index) => (
                       <TableHead key={index}>{header}</TableHead>
                     ))}
@@ -194,7 +209,16 @@ const Index = () => {
                 <TableBody>
                   {csvData.map((row, rowIndex) => (
                     <TableRow key={rowIndex}>
-                      {row.map((cell, cellIndex) => (
+                      <TableCell>
+                        <Button
+                          onClick={() => handleEnrich(rowIndex)}
+                          disabled={row.isEnriched}
+                          size="sm"
+                        >
+                          {row.isEnriched ? 'Enriched' : 'Enrich'}
+                        </Button>
+                      </TableCell>
+                      {row.data.map((cell, cellIndex) => (
                         <TableCell key={cellIndex}>{cell}</TableCell>
                       ))}
                     </TableRow>
