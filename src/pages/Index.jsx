@@ -256,7 +256,8 @@ const Index = () => {
           <CardContent>
             <Progress value={enrichProgress} className="mb-4" />
             <div className="overflow-x-auto">
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Enrich</TableHead>
@@ -280,11 +281,11 @@ const Index = () => {
                       {row.data.map((cell, cellIndex) => (
                         <TableCell key={cellIndex}>{cell}</TableCell>
                       ))}
-                      <TableCell>
+                      <TableCell className="max-w-md">
                         {row.enrichedData ? (
                           <>
-                            <div>{row.enrichedData.split('\n\nDisclaimer:')[0]}</div>
-                            <div className="mt-2 text-xs text-gray-500 italic">
+                            <div className="whitespace-normal break-words">{row.enrichedData.split('\n\nDisclaimer:')[0]}</div>
+                            <div className="mt-2 text-xs text-gray-500 italic whitespace-normal break-words">
                               Disclaimer: {row.enrichedData.split('\n\nDisclaimer:')[1]}
                             </div>
                           </>
@@ -295,7 +296,8 @@ const Index = () => {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </div>
             <div className="mt-4 flex justify-between items-center">
               <div>
