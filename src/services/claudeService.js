@@ -39,7 +39,17 @@ export const getClaudeResponse = async (userMessage) => {
     return await response.json();
   } catch (error) {
     console.error('Error fetching response from Claude:', error);
-    throw error;
+    if (error instanceof Error) {
+      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        throw new Error('Network error. Please check your internet connection.');
+      }
+    }
+    if (!error.response) {
+      throw new Error('No response received from server. Please try again.');
+    }
+    const errorBody = await error.response.text();
+    console.error('Error response body:', errorBody);
+    throw new Error(`Server error: ${error.response.status} - ${errorBody || 'Unknown server error'}`);
   }
 };
 const API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY;
