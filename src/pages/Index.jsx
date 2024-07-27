@@ -187,29 +187,17 @@ const Index = () => {
       toast.success(`Row ${rowIndex + 1} enriched successfully!`);
     } catch (error) {
       console.error('Error enriching data:', error);
-      let errorMessage = 'Unknown error occurred';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-        if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-          errorMessage = 'Network error. Please check your internet connection.';
-        }
-      }
-      if (error.response) {
-        // The request was made and the server responded with a status code
-        // that falls out of the range of 2xx
-        errorMessage = `Server error: ${error.response.status} - ${error.response.data.error || 'Unknown server error'}`;
-      } else if (error.request) {
-        // The request was made but no response was received
-        errorMessage = 'No response received from server. Please try again.';
-      }
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast.error(`Failed to enrich row ${rowIndex + 1}: ${errorMessage}. Please try again.`, {
         duration: 5000, // Display for 5 seconds
       });
       
       // Reset loading state
-      const updatedCsvData = [...csvData];
-      updatedCsvData[rowIndex] = { ...updatedCsvData[rowIndex], isLoading: false };
-      setCsvData(updatedCsvData);
+      setCsvData(prevData => 
+        prevData.map((row, index) => 
+          index === rowIndex ? { ...row, isLoading: false } : row
+        )
+      );
     }
   };
 

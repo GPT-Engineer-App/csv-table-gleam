@@ -93,6 +93,18 @@ export const getClaudeResponse = async (userMessage) => {
     return await response.json();
   } catch (error) {
     console.error('Error fetching response from Claude:', error);
+    if (error instanceof Error) {
+      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        throw new Error('Network error. Please check your internet connection.');
+      }
+    }
+    if (error.response) {
+      const errorBody = await error.response.text();
+      console.error('Error response body:', errorBody);
+      throw new Error(`Server error: ${error.response.status} - ${errorBody || 'Unknown server error'}`);
+    } else if (error.request) {
+      throw new Error('No response received from server. Please try again.');
+    }
     throw error;
   }
 };
