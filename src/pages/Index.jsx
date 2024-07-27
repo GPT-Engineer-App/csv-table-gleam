@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
 const STORAGE_KEY = 'csvFileReference';
-const OPENAI_API_KEY = 'sk-proj-6cUZh3Ed3tGz0cFLVrZhT3BlbkFJ21Mr6uwIN2YGsN9tdX9z';
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
@@ -164,6 +164,10 @@ const Index = () => {
     setCsvData(updatedCsvData);
 
     try {
+      if (!OPENAI_API_KEY) {
+        throw new Error('OpenAI API key is not set. Please check your environment variables.');
+      }
+
       const row = updatedCsvData[rowIndex];
       const locationData = row.data.join(', '); // Assuming all columns contain location data
 
