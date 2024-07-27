@@ -16,6 +16,14 @@ const Index = () => {
   const [csvData, setCsvData] = useState([]);
   const [enrichProgress, setEnrichProgress] = useState(0);
   const [headers, setHeaders] = useState([]);
+  const [expandedRows, setExpandedRows] = useState({});
+
+  const handleReadMore = (rowIndex) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [rowIndex]: !prev[rowIndex]
+    }));
+  };
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -303,8 +311,18 @@ const Index = () => {
                       <TableCell className="max-w-md">
                         {row.enrichedData ? (
                           <>
-                            <div className="whitespace-normal break-words">{row.enrichedData.split('\n\nDisclaimer:')[0]}</div>
-                            <div className="mt-2 text-xs text-gray-500 italic whitespace-normal break-words">
+                            <div className={`whitespace-normal break-words ${expandedRows[rowIndex] ? '' : 'line-clamp-2'}`}>
+                              {row.enrichedData.split('\n\nDisclaimer:')[0]}
+                            </div>
+                            <Button 
+                              variant="link" 
+                              size="sm" 
+                              className="mt-1 p-0 h-auto font-normal"
+                              onClick={() => handleReadMore(rowIndex)}
+                            >
+                              {expandedRows[rowIndex] ? 'Show less' : 'Read more'}
+                            </Button>
+                            <div className={`mt-2 text-xs text-gray-500 italic whitespace-normal break-words ${expandedRows[rowIndex] ? '' : 'line-clamp-1'}`}>
                               Disclaimer: {row.enrichedData.split('\n\nDisclaimer:')[1]}
                             </div>
                           </>
