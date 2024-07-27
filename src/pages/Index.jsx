@@ -11,12 +11,17 @@ import { toast } from 'sonner';
 const PAGE_SIZE = 50;
 const STORAGE_KEY = 'csvFileReference';
 const OPENAI_API_KEY = 'sk-proj-FaFiwa9uR3ahjgtBrQlWT3BlbkFJyO5l9ZNoCwTnN39brHff';
+const STORAGE_KEY = 'csvFileReference';
+const OPENAI_API_KEY = 'sk-proj-FaFiwa9uR3ahjgtBrQlWT3BlbkFJyO5l9ZNoCwTnN39brHff';
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
   const [enrichProgress, setEnrichProgress] = useState(0);
   const [headers, setHeaders] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
+  const [isEnrichingAll, setIsEnrichingAll] = useState(false);
+  const [enrichedCount, setEnrichedCount] = useState(0);
+  const [totalEnrichTime, setTotalEnrichTime] = useState(0);
 
   const handleReadMore = (rowIndex) => {
     setExpandedRows(prev => ({
@@ -132,7 +137,30 @@ const Index = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const handleEnrichAll = async () => {
+    setIsEnrichingAll(true);
+    setEnrichProgress(0);
+    setEnrichedCount(0);
+    setTotalEnrichTime(0);
+
+    for (let i = 0; i < csvData.length; i++) {
+      if (!csvData[i].isEnriched) {
+        const startTime = Date.now();
+        await handleEnrich(i);
+        const endTime = Date.now();
+        setTotalEnrichTime(prev => prev + (endTime - startTime));
+        setEnrichedCount(prev => prev + 1);
+      }
+      setEnrichProgress((i + 1) / csvData.length * 100);
+    }
+
+    setIsEnrichingAll(false);
+    toast.success('All rows have been enriched!');
+  };
+
   const handleEnrich = async (rowIndex) => {
+    if (csvData[rowIndex].isEnriched) return;
+
     const updatedCsvData = [...csvData];
     updatedCsvData[rowIndex] = { ...updatedCsvData[rowIndex], isLoading: true };
     setCsvData(updatedCsvData);
@@ -267,12 +295,50 @@ const Index = () => {
       )}
 
       {headers.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Enrich Data</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center mb-4">
+              <Button 
+                onClick={handleEnrichAll} 
+                disabled={isEnrichingAll || enrichProgress === 100}
+              >
+                {isEnrichingAll ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enriching...
+                  </>
+                ) : enrichProgress === 100 ? (
+                  'All Enriched'
+                ) : (
+                  'Enrich All'
+                )}
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Enriched: {enrichedCount} / {csvData.length} rows
+              </div>
+            </div>
+            <Progress value={enrichProgress} className="mb-2" />
+            <div className="text-sm text-muted-foreground flex justify-between">
+              <span>Progress: {enrichProgress.toFixed(2)}%</span>
+              {totalEnrichTime > 0 && (
+                <span>
+                  Avg. Time per Row: {(totalEnrichTime / enrichedCount / 1000).toFixed(2)}s
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {headers.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>CSV Data</CardTitle>
           </CardHeader>
           <CardContent>
-            <Progress value={enrichProgress} className="mb-4" />
             <div className="overflow-x-auto">
               <div className="overflow-x-auto">
                 <Table>
