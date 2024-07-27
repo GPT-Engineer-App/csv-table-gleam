@@ -149,11 +149,12 @@ const Index = () => {
         })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to fetch from OpenAI API');
+        throw new Error(data.error?.message || 'Failed to fetch from OpenAI API');
       }
 
-      const data = await response.json();
       const description = data.choices[0].message.content;
 
       setCsvData(prevData => 
@@ -171,7 +172,7 @@ const Index = () => {
       toast.success(`Row ${rowIndex + 1} enriched successfully!`);
     } catch (error) {
       console.error('Error enriching data:', error);
-      const errorMessage = error.response?.data?.error?.message || error.message || 'Unknown error occurred';
+      const errorMessage = error.message || 'Unknown error occurred';
       toast.error(`Failed to enrich row ${rowIndex + 1}: ${errorMessage}. Please try again.`);
     }
   };
