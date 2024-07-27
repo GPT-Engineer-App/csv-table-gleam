@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
 const STORAGE_KEY = 'csvFileReference';
-const OPENAI_API_KEY = 'sk-None-LEJmnxiygQwoXl8PRY70T3BlbkFJsGTVdb6eHxi1JkGTEs1G';
+const OPENAI_API_KEY = 'sk-proj-FaFiwa9uR3ahjgtBrQlWT3BlbkFJyO5l9ZNoCwTnN39brHff';
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
