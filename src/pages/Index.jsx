@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -124,8 +125,12 @@ const Index = () => {
   };
 
   const handleEnrich = async (rowIndex) => {
+    const updatedCsvData = [...csvData];
+    updatedCsvData[rowIndex] = { ...updatedCsvData[rowIndex], isLoading: true };
+    setCsvData(updatedCsvData);
+
     try {
-      const row = csvData[rowIndex];
+      const row = updatedCsvData[rowIndex];
       const locationData = row.data.join(', '); // Assuming all columns contain location data
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -175,6 +180,11 @@ const Index = () => {
       console.error('Error enriching data:', error);
       const errorMessage = error.message || 'Unknown error occurred';
       toast.error(`Failed to enrich row ${rowIndex + 1}: ${errorMessage}. Please try again.`);
+      
+      // Reset loading state
+      const updatedCsvData = [...csvData];
+      updatedCsvData[rowIndex] = { ...updatedCsvData[rowIndex], isLoading: false };
+      setCsvData(updatedCsvData);
     }
   };
 
@@ -272,10 +282,19 @@ const Index = () => {
                       <TableCell>
                         <Button
                           onClick={() => handleEnrich(rowIndex)}
-                          disabled={row.isEnriched}
+                          disabled={row.isEnriched || row.isLoading}
                           size="sm"
                         >
-                          {row.isEnriched ? 'Enriched' : 'Enrich'}
+                          {row.isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Enriching...
+                            </>
+                          ) : row.isEnriched ? (
+                            'Enriched'
+                          ) : (
+                            'Enrich'
+                          )}
                         </Button>
                       </TableCell>
                       {row.data.map((cell, cellIndex) => (
