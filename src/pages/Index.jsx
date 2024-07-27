@@ -4,13 +4,16 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
 const STORAGE_KEY = 'csvFileReference';
+const OPENAI_API_KEY = 'sk-None-kM7TyYToQVWOyEVTOBeJT3BlbkFJ80nFDvEIXPlWrnj8dJAZ';
 
 const Index = () => {
   const [csvData, setCsvData] = useState([]);
+  const [enrichProgress, setEnrichProgress] = useState(0);
   const [headers, setHeaders] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -39,12 +42,22 @@ const Index = () => {
       
       const startIndex = (currentPage - 1) * PAGE_SIZE + 1;
       const endIndex = Math.min(startIndex + PAGE_SIZE, rows.length);
-      const pageData = rows.slice(startIndex, endIndex).map(row => ({
-        isEnriched: false,
-        data: row.split(',').map(cell => cell.trim())
-      }));
+      const pageData = rows.slice(startIndex, endIndex).map((row, index) => {
+        const rowIndex = startIndex + index - 1;
+        const cachedData = localStorage.getItem(`enriched_row_${rowIndex}`);
+        const parsedCachedData = cachedData ? JSON.parse(cachedData) : null;
+        return {
+          isEnriched: parsedCachedData ? parsedCachedData.isEnriched : false,
+          data: row.split(',').map(cell => cell.trim()),
+          enrichedData: parsedCachedData ? parsedCachedData.enrichedData : null
+        };
+      });
       
       setCsvData(pageData);
+      
+      // Calculate initial progress based on cached data
+      const initialProgress = pageData.filter(row => row.isEnriched).length / pageData.length * 100;
+      setEnrichProgress(initialProgress);
       setIsLoading(false);
     };
     reader.onerror = () => {
@@ -110,14 +123,56 @@ const Index = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleEnrich = (rowIndex) => {
-    setCsvData(prevData => 
-      prevData.map((row, index) => 
-        index === rowIndex ? { ...row, isEnriched: true } : row
-      )
-    );
-    toast.success(`Row ${rowIndex + 1} enriched successfully!`);
-    // Add your actual enrichment logic here
+  const handleEnrich = async (rowIndex) => {
+    try {
+      const row = csvData[rowIndex];
+      const locationData = row.data.join(', '); // Assuming all columns contain location data
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful assistant that provides brief and informative descriptions of locations."
+            },
+            {
+              role: "user",
+              content: `Provide a brief and informative description of this location: ${locationData}`
+            }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch from OpenAI API');
+      }
+
+      const data = await response.json();
+      const description = data.choices[0].message.content;
+
+      setCsvData(prevData => 
+        prevData.map((row, index) => 
+          index === rowIndex ? { ...row, isEnriched: true, enrichedData: description } : row
+        )
+      );
+
+      // Update progress
+      setEnrichProgress(prev => prev + (100 / csvData.length));
+
+      // Save to local storage
+      localStorage.setItem(`enriched_row_${rowIndex}`, JSON.stringify({ isEnriched: true, enrichedData: description }));
+
+      toast.success(`Row ${rowIndex + 1} enriched successfully!`);
+    } catch (error) {
+      console.error('Error enriching data:', error);
+      toast.error(`Failed to enrich row ${rowIndex + 1}. Please try again.`);
+    }
   };
 
   return (
@@ -196,6 +251,7 @@ const Index = () => {
             <CardTitle>CSV Data</CardTitle>
           </CardHeader>
           <CardContent>
+            <Progress value={enrichProgress} className="mb-4" />
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -221,6 +277,7 @@ const Index = () => {
                       {row.data.map((cell, cellIndex) => (
                         <TableCell key={cellIndex}>{cell}</TableCell>
                       ))}
+                      <TableCell>{row.enrichedData || 'Not enriched yet'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
